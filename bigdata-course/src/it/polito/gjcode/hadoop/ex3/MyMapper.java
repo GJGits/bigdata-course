@@ -22,7 +22,7 @@ public class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
 
 		String[] tokens = value.toString().split(",");
 		String sensorId = tokens[0];
-		double pm10Value = Double.valueOf(tokens[1].split(" ")[1]);
+		double pm10Value = Double.valueOf(tokens[2]);
 
 		if (pm10Value > threshold)
 			context.write(new Text(sensorId), new IntWritable(1));
