@@ -11,8 +11,11 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+
+import scala.Tuple2;
 
 public class SparkDriver {
 
@@ -25,12 +28,14 @@ public class SparkDriver {
 		String outputNameFileKML = args[3];
 
 		// Create context and RDDs
+
 		SparkConf conf = new SparkConf().setAppName("[Spark app lab7]");
 		JavaSparkContext context = new JavaSparkContext(conf);
 		JavaRDD<String> registersRDD = context.textFile(registerPath);
 		JavaRDD<String> stationsRDD = context.textFile(stationsPath);
 
 		// Filter RDDs and store what we need
+
 		JavaRDD<String> filteredRegistersRDD = registersRDD.filter(line -> {
 			String[] tokens = line.split("\\s+");
 			String stationId = tokens[0];
@@ -39,7 +44,73 @@ public class SparkDriver {
 			return stationId != "stationId" && !(usedSlots == 0 && freeSlots == 0);
 		});
 
-		// TODO: rest of the application
+		// Create a pairRDD in the format:
+		// register -> <stationId-slot> <Iterable of freeSlots>
+
+		JavaPairRDD<String, Iterable<Integer>> registerPairsRDD = filteredRegistersRDD.mapToPair(line -> {
+
+			String[] lineTokens = line.split("\\s+");
+			String stationId = lineTokens[0];
+			String slot = DateTool.getTimeSlot(lineTokens[1].trim());
+			int freeSlots = Integer.parseInt(lineTokens[4]);
+
+			return new Tuple2<String, Integer>(stationId + slot, freeSlots);
+		}).groupByKey();
+
+		// Create an RDD in the format:
+		// <stationId-slot> <criticality>
+
+		JavaPairRDD<String, Double> stationSlotCriticalityRDD = registerPairsRDD.mapToPair(element -> {
+
+			double elementsCounter = 0.0;
+			double criticality = 0.0;
+			// count the reads with a value of 0 free slots
+			double numberOfZeroReadings = 0.0;
+
+			for (Integer freeSlots : element._2) {
+				if (freeSlots.intValue() == 0)
+					numberOfZeroReadings++;
+				elementsCounter++;
+			}
+
+			criticality = numberOfZeroReadings / elementsCounter;
+
+			return new Tuple2<String, Double>(element._1, criticality);
+		}).filter(element -> element._2 > criticalityTrashold);
+
+		// Create a pairRDD in the format:
+		// <stationId> <Iterable<slot-criticality>>
+
+		JavaPairRDD<String, Iterable<String>> stationSlotCriticalitiesRDD = stationSlotCriticalityRDD
+				.mapToPair(element -> {
+
+					String[] tokens = element._1.split("-");
+					String stationId = tokens[0];
+					String slot = tokens[1];
+
+					return new Tuple2<String, String>(stationId, String.join("-", slot, String.valueOf(element._2)));
+				}).groupByKey();
+
+		// Create the final register pair:
+		// <stationId> <slot>
+
+		JavaPairRDD<String, String> criticalSlotRDD = stationSlotCriticalitiesRDD.mapToPair(element -> {
+
+			double maxCrit = 0.0;
+			String maxSlot = "";
+
+			for (String slotCritic : element._2) {
+				String[] tokens = slotCritic.split("-");
+				String slot = tokens[0];
+				double critic = Double.parseDouble(tokens[1]);
+				if (critic > maxCrit) {
+					maxCrit = critic;
+					maxSlot = slot;
+				}
+			}
+
+			return new Tuple2<String, String>(maxSlot, String.valueOf(maxCrit));
+		});
 
 		// Store in resultKML one String, representing a KML marker, for each station
 		// with a critical timeslot

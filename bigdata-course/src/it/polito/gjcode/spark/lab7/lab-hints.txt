@@ -1,0 +1,4 @@
+ripensa secondo passaggio. Noi abbiamo bisogno del numero di
+free-slots non del valore. Cerca quindi di ridurre ad un WordCount
+memorizzando per esempio in una tupla slot-1 e poi reduce per 
+avere il numeratore.
