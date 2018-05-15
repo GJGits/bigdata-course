@@ -1,4 +1,4 @@
-package it.polito.gjcode.spark.ex1;
+package it.polito.gjcode.spark.ex30;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaRDD;
