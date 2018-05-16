@@ -32,7 +32,8 @@ public class SparkDriver {
 		SparkConf conf = new SparkConf().setAppName("[Spark app lab7]");
 		JavaSparkContext context = new JavaSparkContext(conf);
 		JavaRDD<String> registersRDD = context.textFile(registerPath);
-		JavaRDD<String> stationsRDD = context.textFile(stationsPath);
+		JavaRDD<String> stationsRDD = context.textFile(stationsPath)
+				.filter(line -> line.split("\\s+")[0] != "stationId");
 
 		// Filter RDDs and store what we need
 
@@ -92,7 +93,7 @@ public class SparkDriver {
 				}).groupByKey();
 
 		// Create the final register pair:
-		// <stationId> <slot>
+		// <stationId> <slot-value>
 
 		JavaPairRDD<String, String> criticalSlotRDD = stationSlotCriticalitiesRDD.mapToPair(element -> {
 
@@ -109,13 +110,45 @@ public class SparkDriver {
 				}
 			}
 
-			return new Tuple2<String, String>(maxSlot, String.valueOf(maxCrit));
+			return new Tuple2<String, String>(element._1, String.join("-", maxSlot, String.valueOf(maxCrit)));
+		});
+
+		// Create the stations pair RDD
+		JavaPairRDD<String, String> stationsPairRDD = stationsRDD.mapToPair(line -> {
+
+			String[] tokens = line.split("\\s+");
+			String stationId = tokens[0];
+			String lat = tokens[1];
+			String lng = tokens[2];
+			String nome = tokens[4];
+
+			return new Tuple2<String, String>(stationId, String.join("-", lat, lng, nome));
+
 		});
 
 		// Store in resultKML one String, representing a KML marker, for each station
 		// with a critical timeslot
 		// JavaRDD<String> resultKML = ;
-		JavaRDD<String> resultKML = null;
+		JavaRDD<String> resultKML = criticalSlotRDD.join(stationsPairRDD).map(element -> {
+
+			String stationId = element._1;
+			String[] registerTokens = element._2._1.split("-");
+			String[] stationTokens = element._2._2.split("-");
+			String day = registerTokens[0].split("-")[0];
+			String hour = registerTokens[0].split("-")[1];
+			String criticValue = registerTokens[1];
+			String lat = stationTokens[0];
+			String lng = stationTokens[1];
+			String nome = stationTokens[2];
+
+			String kmlElement = "<Placemark><name>" + stationId + "</name><ExtendedData><Data\n"
+					+ "name=\"DayWeek\"><value>" + day + "</value></Data>><Data\n" + "name=\"Hour\"><value>" + hour
+					+ "</value></Data><Data\n" + "name=\"Criticality\"><value>" + criticValue
+					+ "</value></Data></ExtendedData><\n" + "Point><coordinates>" + lat + "," + lng
+					+ "</coordinates></Point></Placemark>";
+
+			return kmlElement;
+		});
 
 		// There is at most one string for each station. We can use collect and
 		// store the returned list in the main memory of the driver.
