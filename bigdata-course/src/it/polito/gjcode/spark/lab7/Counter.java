@@ -1,7 +1,10 @@
 package it.polito.gjcode.spark.lab7;
 
-public class Counter {
+import java.io.Serializable;
 
+public class Counter implements Serializable {
+
+	private static final long serialVersionUID = 1L;
 	private int sum;
 	private int count;
 

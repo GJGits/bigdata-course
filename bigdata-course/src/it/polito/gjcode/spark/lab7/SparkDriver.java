@@ -29,7 +29,7 @@ public class SparkDriver {
 				.filter(line -> line.split("\\s+")[0] != "stationId").mapToPair(line -> {
 					String[] tokensLine = line.split("\\s+");
 					String stationId = tokensLine[0];
-					String latLng = tokensLine[0] + "-" + tokensLine[1];
+					String latLng = tokensLine[1] + "-" + tokensLine[2];
 					return new Tuple2<String, String>(stationId, latLng);
 				});
 
@@ -39,9 +39,7 @@ public class SparkDriver {
 		JavaRDD<String> filteredRegistersRDD = registersRDD.filter(line -> {
 			String[] tokens = line.split("\\s+");
 			String stationId = tokens[0];
-			int usedSlots = Integer.parseInt(tokens[3]);
-			int freeSlots = Integer.parseInt(tokens[4]);
-			return stationId != "stationId" && !(usedSlots == 0 && freeSlots == 0);
+			return stationId != "stationId" && !(tokens[3].trim() == "0" && tokens[4].trim() == "0");
 		});
 
 		// Create a pair RDD in the format:
@@ -49,9 +47,9 @@ public class SparkDriver {
 
 		JavaPairRDD<String, String> stationSlotCriticalityRDD = filteredRegistersRDD.mapToPair(line -> {
 
-			String[] lineTokens = line.split("\\s+");
+			String[] lineTokens = line.trim().split("\\s+");
 			String stationId = lineTokens[0];
-			String slot = DateTool.getTimeSlot(lineTokens[1]);
+			String slot = DateTool.getTimeSlot(lineTokens[1] + " " + lineTokens[2]);
 			String rddKey = stationId + "-" + slot;
 			int freeSlots = Integer.parseInt(lineTokens[4]);
 
