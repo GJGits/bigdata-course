@@ -8,7 +8,7 @@ public class DateTool {
 
 	public static String getTimeSlot(String timeStamp) {
 
-		String[] timeStampTokens = timeStamp.split(" ");
+		String[] timeStampTokens = timeStamp.split("\\s+");
 		String date = timeStampTokens[0];
 		String time = timeStampTokens[1];
 		LocalDate localDate = LocalDate.parse(date, DateTimeFormatter.ISO_DATE);
