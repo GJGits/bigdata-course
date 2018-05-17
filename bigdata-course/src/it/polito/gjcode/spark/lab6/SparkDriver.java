@@ -5,7 +5,6 @@ import org.apache.spark.api.java.*;
 import scala.Tuple2;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import org.apache.spark.SparkConf;
@@ -15,53 +14,69 @@ public class SparkDriver {
 	public static void main(String[] args) {
 
 		String inputPath;
-		String outputPath;
 
 		inputPath = args[0];
-		outputPath = args[1];
 
 		// Create a configuration object and set the name of the application
-		SparkConf conf = new SparkConf().setAppName("Spark Lab #6");
+		SparkConf conf = new SparkConf().setAppName("Spark Lab6");
 
 		// Create a Spark Context object
 		JavaSparkContext sc = new JavaSparkContext(conf);
 
 		// Read the content of the input file
-		JavaRDD<String> inputRDD = sc.textFile(inputPath);
+		JavaRDD<String> reviewsRDD = sc.textFile(inputPath);
 
-		// transpose the RDD into a pairRDD
-		// output contains <userid> -> <list of products>
-		JavaPairRDD<String, Iterable<String>> userProdsRDD = inputRDD.mapToPair(line -> {
-			String[] lineTokens = line.split(",");
-			return new Tuple2<String, String>(lineTokens[2], lineTokens[1]);
-		}).groupByKey();
+		JavaRDD<String> reviewsRDDnoHeader = reviewsRDD.filter(line -> !line.startsWith("Id"));
 
-		JavaPairRDD<String, Iterable<Integer>> prodOnes = userProdsRDD.values().flatMapToPair(element -> {
-			List<Tuple2<String, Integer>> list = new ArrayList<>();
-			for (String prod1 : element) {
-				for (String prod2 : element) {
-					String toEmit = prod1.compareTo(prod2) < 0 ? prod1 + prod2 : prod2 + prod1;
-					list.add(new Tuple2<String, Integer>(toEmit, Integer.valueOf(1)));
+		// Generate one pair UserId, ProductId for each input line
+		JavaPairRDD<String, String> pairUserProduct = reviewsRDDnoHeader.mapToPair(s -> {
+			String[] features = s.split(",");
+
+			return new Tuple2<String, String>(features[2], features[1]);
+		});
+
+		// Generate one "transaction" for each user
+		// <user_id> → < list of the product_ids reviewed>
+		JavaPairRDD<String, Iterable<String>> UserIDListOfReviewedProducts = pairUserProduct.groupByKey();
+
+		// We are interested only in the value part (the lists of products that have
+		// been reviewed together)
+
+		JavaRDD<Iterable<String>> transactions = UserIDListOfReviewedProducts.values();
+
+		// Generate a PairRDD of (key,value) pairs. One pair for each combination of
+		// products
+		// appearing in the same transaction
+		// - key = pair of products reviewed together
+		// - value = 1
+		JavaPairRDD<String, Integer> pairsOfProductsOne = transactions.flatMapToPair(products -> {
+			List<Tuple2<String, Integer>> results = new ArrayList<>();
+
+			for (String p1 : products) {
+				for (String p2 : products) {
+					if (p1.compareTo(p2) > 0)
+						results.add(new Tuple2<String, Integer>(p1 + " " + p2, 1));
 				}
 			}
-			return list.iterator();
-		}).groupByKey();
 
-		Comparator<Tuple2<String, Integer>> comp = (Tuple2<String, Integer> tup1,
-				Tuple2<String, Integer> tup2) -> tup1._2 - tup2._2;
+			return results.iterator();
+		});
 
-		List<Tuple2<String, Integer>> pairVal = prodOnes.mapToPair(element -> {
-			int val = 0;
-			for (Integer one : element._2) {
-				val += one.intValue();
-			}
-			return new Tuple2<String, Integer>(element._1, Integer.valueOf(val));
-		}).top(10, comp);
+		// Count the frequency (i.e., number of occurrences) of each key (= pair of
+		// products)
+		JavaPairRDD<String, Integer> pairsFrequencies = pairsOfProductsOne
+				.reduceByKey((count1, count2) -> count1 + count2);
 
-		JavaRDD<Tuple2<String, Integer>> resultRDD = sc.parallelize(pairVal);
+		// Select only the pairs that appear more than once and their frequencies.
+		JavaPairRDD<String, Integer> atLeast2PairsFrequencies = pairsFrequencies.filter(t -> t._2() > 1);
 
-		// Store the result in the output folder
-		resultRDD.saveAsTextFile(outputPath);
+		// Take the first 10 elements of pairsFrequencies
+		// based on top + a personalized comparator
+		List<Tuple2<String, Integer>> topList = atLeast2PairsFrequencies.top(10, new FreqComparatorTop());
+
+		for (Tuple2<String, Integer> productFrequency : topList) {
+			System.out.println(productFrequency);
+		}
 
 		// Close the Spark context
 		sc.close();
