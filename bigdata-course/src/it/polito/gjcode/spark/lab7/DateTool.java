@@ -1,21 +1,62 @@
 package it.polito.gjcode.spark.lab7;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 
 public class DateTool {
 
-	public static String getTimeSlot(String timeStamp) {
+	public static String DayOfTheWeek(String date) {
 
-		String[] timeStampTokens = timeStamp.split("\\s+");
-		String date = timeStampTokens[0];
-		String time = timeStampTokens[1];
-		LocalDate localDate = LocalDate.parse(date, DateTimeFormatter.ISO_DATE);
-		LocalTime localTime = LocalTime.parse(time, DateTimeFormatter.ISO_LOCAL_TIME);
-		String dayOfTheWeek = localDate.getDayOfWeek().toString();
-		int hour = localTime.getHour();
-		return String.join("-", dayOfTheWeek, String.valueOf(hour));
+		String dayOfTheWeek;
+		SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+		Date d = new Date();
+		Calendar cal = Calendar.getInstance();
+
+		try {
+			d = format.parse(date);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
+
+		cal.setTime(d);
+
+		switch (cal.get(Calendar.DAY_OF_WEEK)) {
+		case Calendar.SUNDAY:
+			dayOfTheWeek = "Sun";
+			break;
+
+		case Calendar.MONDAY:
+			dayOfTheWeek = "Mon";
+			break;
+
+		case Calendar.TUESDAY:
+			dayOfTheWeek = "Tue";
+			break;
+
+		case Calendar.WEDNESDAY:
+			dayOfTheWeek = "Wed";
+			break;
+
+		case Calendar.THURSDAY:
+			dayOfTheWeek = "Thu";
+			break;
+
+		case Calendar.FRIDAY:
+			dayOfTheWeek = "Fri";
+			break;
+
+		case Calendar.SATURDAY:
+			dayOfTheWeek = "Sat";
+			break;
+
+		default:
+			dayOfTheWeek = "Sat";
+
+		}
+
+		return dayOfTheWeek;
 	}
 
 }

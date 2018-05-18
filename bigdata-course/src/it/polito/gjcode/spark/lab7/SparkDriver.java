@@ -1,87 +1,222 @@
 package it.polito.gjcode.spark.lab7;
 
-import org.apache.spark.SparkConf;
-import org.apache.spark.api.java.JavaPairRDD;
-import org.apache.spark.api.java.JavaRDD;
-import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.*;
 
 import scala.Tuple2;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.net.URI;
+import java.util.List;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.spark.SparkConf;
+
 public class SparkDriver {
 
+	@SuppressWarnings("resource")
 	public static void main(String[] args) {
 
-		// Arguments
-		String registerPath = args[0];
-		String stationsPath = args[1];
-		double criticalityTrashold = Double.parseDouble(args[2]);
-		String outputNameFileKML = args[3];
+		String inputPath;
+		String inputPath2;
+		Double threshold;
+		String outputNameFileKML;
 
-		// Create context and RDDs
+		inputPath = args[0];
+		inputPath2 = args[1];
+		threshold = new Double(args[2]);
+		outputNameFileKML = args[3];
 
-		SparkConf conf = new SparkConf().setAppName("[Spark app lab7]");
-		JavaSparkContext context = new JavaSparkContext(conf);
-		JavaRDD<String> registersRDD = context.textFile(registerPath);
+		// Create a configuration object and set the name of the application
+		SparkConf conf = new SparkConf().setAppName("Spark Lab #7");
 
-		// Delete header from stations.csv file and create station pair RDD.
+		// Create a Spark Context object
+		JavaSparkContext sc = new JavaSparkContext(conf);
 
-		JavaPairRDD<String, String> stationsRDD = context.textFile(stationsPath)
-				.filter(line -> line.split("\\s+")[0] != "stationId").mapToPair(line -> {
-					String[] tokensLine = line.split("\\s+");
-					String stationId = tokensLine[0];
-					String latLng = tokensLine[0] + "-" + tokensLine[1];
-					return new Tuple2<String, String>(stationId, latLng);
-				});
+		// Read the content of the input file
+		JavaRDD<String> inputRDD = sc.textFile(inputPath);
 
-		// Delete header from registers.csv, filter to remove inconsistent readings and
-		// store the content into an RDD.
+		// Remove the header and the lines with #free slots=0 && #used slots=0
+		JavaRDD<String> filteredRDD = inputRDD.filter(line -> {
+			// Remove header
+			if (line.startsWith("s") == true) {
+				return false;
+			} else {
+				String[] fields = line.split("\\t");
+				int usedSlots = Integer.parseInt(fields[2]);
+				int freeSlots = Integer.parseInt(fields[3]);
 
-		JavaRDD<String> filteredRegistersRDD = registersRDD.filter(line -> {
-			String[] tokens = line.split("\\s+");
-			String stationId = tokens[0];
-			int usedSlots = Integer.parseInt(tokens[3]);
-			int freeSlots = Integer.parseInt(tokens[4]);
-			return stationId != "stationId" && !(usedSlots == 0 && freeSlots == 0);
+				// Select the lines with freeSlots!=0 || usedSlots!=0
+				if (freeSlots != 0 || usedSlots != 0) {
+					return true;
+				} else
+					return false;
+			}
 		});
 
-		// Create a pair RDD in the format:
-		// <stationId-slot> <criticality value>
+		// Map each line to a pair
+		// key = StationId_DayOfTheWeek_Hour
+		// value = (1,1) if the station is full, (1,0) if the station is not
+		// full
+		JavaPairRDD<String, CountTotReadingsTotFull> stationWeekDayHour = filteredRDD.mapToPair(line -> {
+			// station timestamp used free
+			// 1 2008-05-15 12:01:00 0 18
 
-		JavaPairRDD<String, String> stationSlotCriticalityRDD = filteredRegistersRDD.mapToPair(line -> {
+			String[] fields = line.split("\\t");
+			int freeSlots = Integer.parseInt(fields[3]);
 
-			String[] lineTokens = line.split("\\s+");
-			String stationId = lineTokens[0];
-			String slot = DateTool.getTimeSlot(lineTokens[1]);
-			String rddKey = stationId + "-" + slot;
-			int freeSlots = Integer.parseInt(lineTokens[4]);
+			String[] timestamp = fields[1].split(" ");
+			String dayOfTheWeek = DateTool.DayOfTheWeek(timestamp[0]);
+			String hour = timestamp[1].replaceAll(":.*", "");
 
-			// The first element represents the sum of 0 values and the second the items
-			// counter.
+			CountTotReadingsTotFull countRF;
 
-			Counter rddValue = freeSlots == 0 ? new Counter(1, 1) : new Counter(0, 1);
-			return new Tuple2<String, Counter>(rddKey, rddValue);
+			if (freeSlots == 0) {
+				// The station is full
+				countRF = new CountTotReadingsTotFull(1, 1);
+			} else {
+				// The station is not full
+				countRF = new CountTotReadingsTotFull(1, 0);
+			}
 
-		}).reduceByKey((Counter c1, Counter c2) -> {
+			return new Tuple2<String, CountTotReadingsTotFull>(fields[0] + "_" + dayOfTheWeek + "_" + hour, countRF);
+		});
 
-			int newSum = c1.getSum() + c2.getSum();
-			int newCount = c1.getCount() + c2.getCount();
-			return new Counter(newSum, newCount);
+		// Count the total number of readings and "full" readings for each key
+		JavaPairRDD<String, CountTotReadingsTotFull> stationWeekDayHourCounts = stationWeekDayHour.reduceByKey(
+				(element1, element2) -> new CountTotReadingsTotFull(element1.numReadings + element2.numReadings,
+						element1.numFullReadings + element2.numFullReadings));
 
-		}).mapToPair(element -> {
-			double criticalSlotValue = (double) (element._2.getSum() / element._2.getCount());
-			String stationId = element._1.split("-")[0];
-			String rddValue = element._1.split("-")[1] + "-" + criticalSlotValue;
-			return new Tuple2<>(stationId, rddValue);
-		}).filter(element -> Double.valueOf(element._2.split("-")[1]) > criticalityTrashold);
+		// Compute criticality for each key
+		JavaPairRDD<String, Double> stationWeekDayHourCriticality = stationWeekDayHourCounts
+				.mapValues(value -> new Double((double) value.numFullReadings / (double) value.numReadings));
 
-		// Join the RDD
+		// Select only the pairs with criticality > threshold
+		JavaPairRDD<String, Double> selectedPairs = stationWeekDayHourCriticality.filter(value -> {
+			double criticality = value._2().doubleValue();
 
-		JavaPairRDD<String, Tuple2<String, String>> finalRDD = stationSlotCriticalityRDD.join(stationsRDD);
-		System.out.println("Output:\n" + finalRDD.collect());
+			if (criticality >= threshold) {
+				return true;
+			} else {
+				return false;
+			}
+		});
 
-		// Close the context
-		context.close();
+		// The next part of the code selects for each station the timeslot
+		// (dayOfTheWeek_Hour) with
+		// the maximum cardinality. If there is more than one timeslot with the
+		// same criticality
+		// for the same station, only one of them is selected (see the problem
+		// specification).
 
+		// Create a new PairRDD with
+		// key = DayOfTheWeek - Hour
+		// value = Criticality
+		JavaPairRDD<String, DayOfWeekHourCrit> stationTimeslotCrit = selectedPairs
+				.mapToPair(StationDayWeekHourCount -> {
+					// (2_Sat_02,402)
+					String[] fields = StationDayWeekHourCount._1().split("_");
+					String stationId = fields[0];
+					String dayWeek = fields[1];
+					String hour = fields[2];
+
+					Double criticality = StationDayWeekHourCount._2();
+
+					return new Tuple2<String, DayOfWeekHourCrit>(stationId,
+							new DayOfWeekHourCrit(dayWeek, Integer.parseInt(hour), criticality));
+				});
+
+		// Select the timeslot (dayOfTheWeek_Hour) with the maximum criticality
+		// for each station
+		JavaPairRDD<String, DayOfWeekHourCrit> resultRDD = stationTimeslotCrit
+				.reduceByKey((DayOfWeekHourCrit value1, DayOfWeekHourCrit value2) -> {
+					if (value1.criticality > value2.criticality
+							|| (value1.criticality == value2.criticality && value1.hour < value2.hour)
+							|| (value1.criticality == value2.criticality && value1.hour == value2.hour
+									&& value1.dayOfTheWeek.compareTo(value2.dayOfTheWeek) < 0)) {
+						return new DayOfWeekHourCrit(value1.dayOfTheWeek, value1.hour, value1.criticality);
+					} else {
+						return new DayOfWeekHourCrit(value2.dayOfTheWeek, value2.hour, value2.criticality);
+					}
+				});
+
+		// Read the location of the stations
+		JavaPairRDD<String, String> stationLocation = sc.textFile(inputPath2).mapToPair(line -> {
+			// id latitude longitude name
+			// 1 41.397978 2.180019 Gran Via Corts Catalanes
+			String[] fields = line.split("\\t");
+
+			return new Tuple2<String, String>(fields[0], fields[1] + "," + fields[2]);
+		});
+
+		// Join the locations with the "critical" stations
+		JavaPairRDD<String, Tuple2<DayOfWeekHourCrit, String>> resultLocations = resultRDD.join(stationLocation);
+
+		// Create a string containing the description of a marker, in the KML
+		// format, for each
+		// sensor and the associated information
+		JavaRDD<String> resultKML = resultLocations
+				.map((Tuple2<String, Tuple2<DayOfWeekHourCrit, String>> StationMax) -> {
+
+					String stationId = StationMax._1();
+
+					DayOfWeekHourCrit dWHC = StationMax._2()._1();
+					String coordinates = StationMax._2()._2();
+
+					String result = "<Placemark><name>" + stationId + "</name>" + "<ExtendedData>"
+							+ "<Data name=\"DayWeek\"><value>" + dWHC.dayOfTheWeek + "</value></Data>"
+							+ "<Data name=\"Hour\"><value>" + dWHC.hour + "</value></Data>"
+							+ "<Data name=\"Criticality\"><value>" + dWHC.criticality + "</value></Data>"
+							+ "</ExtendedData>" + "<Point>" + "<coordinates>" + coordinates + "</coordinates>"
+							+ "</Point>" + "</Placemark>";
+
+					return result;
+				});
+
+		// There is at most one string for each station. We can use collect and
+		// store the returned list in the main memory of the driver.
+		List<String> localKML = resultKML.collect();
+
+		// Store the result in one single file stored in the distributed file
+		// system
+		// Add header and footer, and the content of localKML in the middle
+		Configuration confHadoop = new Configuration();
+
+		try {
+			URI uri = URI.create(outputNameFileKML);
+
+			FileSystem file = FileSystem.get(uri, confHadoop);
+			FSDataOutputStream outputFile = file.create(new Path(uri));
+
+			BufferedWriter bOutFile = new BufferedWriter(new OutputStreamWriter(outputFile, "UTF-8"));
+
+			// Header
+			bOutFile.write("<kml xmlns=\"http://www.opengis.net/kml/2.2\"><Document>");
+			bOutFile.newLine();
+
+			// Markers
+			for (String lineKML : localKML) {
+				bOutFile.write(lineKML);
+				bOutFile.newLine();
+			}
+
+			// Footer
+			bOutFile.write("</Document></kml>");
+			bOutFile.newLine();
+
+			bOutFile.close();
+			outputFile.close();
+
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+
+		// Close the Spark context
+		sc.close();
 	}
-
 }
+
