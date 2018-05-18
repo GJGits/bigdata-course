@@ -1,5 +1,9 @@
 package it.polito.gjcode.spark.lab7;
 
+import java.text.MessageFormat;
+import java.util.LinkedList;
+import java.util.List;
+
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -26,8 +30,8 @@ public class SparkDriver {
 		// Delete header from stations.csv file and create station pair RDD.
 
 		JavaPairRDD<String, String> stationsRDD = context.textFile(stationsPath)
-				.filter(line -> line.split("\\s+")[0] != "stationId").mapToPair(line -> {
-					String[] tokensLine = line.split("\\s+");
+				.filter(line -> line.split("\\t")[0] != "stationId").mapToPair(line -> {
+					String[] tokensLine = line.split("\\t");
 					String stationId = tokensLine[0];
 					String latLng = tokensLine[1] + "-" + tokensLine[2];
 					return new Tuple2<String, String>(stationId, latLng);
@@ -37,9 +41,10 @@ public class SparkDriver {
 		// store the content into an RDD.
 
 		JavaRDD<String> filteredRegistersRDD = registersRDD.filter(line -> {
-			String[] tokens = line.split("\\s+");
-			String stationId = tokens[0];
-			return stationId != "stationId" && !(tokens[3].trim() == "0" && tokens[4].trim() == "0");
+			String[] tokens = line.split("\\t");
+			if(line.startsWith("s"))
+				return false;
+			return tokens[2].trim() != "0" || tokens[3].trim() != "0";
 		});
 
 		// Create a pair RDD in the format:
@@ -47,11 +52,11 @@ public class SparkDriver {
 
 		JavaPairRDD<String, String> stationSlotCriticalityRDD = filteredRegistersRDD.mapToPair(line -> {
 
-			String[] lineTokens = line.trim().split("\\s+");
+			String[] lineTokens = line.split("\\t");
 			String stationId = lineTokens[0];
-			String slot = DateTool.getTimeSlot(lineTokens[1] + " " + lineTokens[2]);
+			String slot = Tools.getTimeSlot(lineTokens[1]);
 			String rddKey = stationId + "-" + slot;
-			int freeSlots = Integer.parseInt(lineTokens[4]);
+			int freeSlots = Integer.parseInt(lineTokens[3]);
 
 			// The first element represents the sum of 0 values and the second the items
 			// counter.
@@ -66,16 +71,43 @@ public class SparkDriver {
 			return new Counter(newSum, newCount);
 
 		}).mapToPair(element -> {
+
 			double criticalSlotValue = (double) (element._2.getSum() / element._2.getCount());
 			String stationId = element._1.split("-")[0];
 			String rddValue = element._1.split("-")[1] + "-" + criticalSlotValue;
 			return new Tuple2<>(stationId, rddValue);
+
 		}).filter(element -> Double.valueOf(element._2.split("-")[1]) > criticalityTrashold);
 
-		// Join the RDD
+		// Join the RDDs and create the kml file
 
-		JavaPairRDD<String, Tuple2<String, String>> finalRDD = stationSlotCriticalityRDD.join(stationsRDD);
-		System.out.println("Output:\n" + finalRDD.collect());
+		List<String> kmlElements = new LinkedList<>();
+
+		JavaRDD<String> finalRDD = stationSlotCriticalityRDD.join(stationsRDD).map(element -> {
+
+			String stationId = element._1;
+			// element._2._1 = date-hour-criticalValue
+			String slotDay = element._2._1.split("-")[0];
+			String slotHour = element._2._1.split("-")[1];
+			String criticalValue = element._2._1.split("-")[2];
+			// element._2._2 = lat-lng
+			String lat = element._2._2.split("-")[0];
+			String lng = element._2._2.split("-")[1];
+
+			String elementTemplate = "<Placemark><name>{0}</name><ExtendedData><Data\n"
+					+ "name=\"DayWeek\"><value>{1}</value></Data><Data\n"
+					+ "name=\"Hour\"><value>{2}</value></Data><Data\n"
+					+ "name=\"Criticality\"><value>{3}</value></Data></ExtendedData><\n"
+					+ "Point><coordinates>{4},{5}</coordinates></Point></Placemark>";
+
+			String kmlElement = MessageFormat.format(elementTemplate, stationId, slotDay, slotHour, criticalValue, lat,
+					lng);
+
+			return kmlElement;
+		});
+
+		kmlElements.addAll(finalRDD.collect());
+		Tools.writeKmlFile(outputNameFileKML, kmlElements);
 
 		// Close the context
 		context.close();
