@@ -37,10 +37,8 @@ public class SparkDriver {
 		// the third column of the dfReadingsPerSensor RelationalGroupedDataset.
 		// Compute the max of _c2 for each group.
 		// Cast the returned DataFrame to a Dataset<SensorMax>
-		Dataset<SensorMax> maxValuePerSensorDS = rgdReadingsPerSensor.max("_c2")
-				.withColumnRenamed("_c0", "sensorid")
-				.withColumnRenamed("max(_c2)", "maxPM10")
-				.as(Encoders.bean(SensorMax.class));
+		Dataset<SensorMax> maxValuePerSensorDS = rgdReadingsPerSensor.max("_c2").withColumnRenamed("_c0", "sensorid")
+				.withColumnRenamed("max(_c2)", "maxPM10").as(Encoders.bean(SensorMax.class));
 
 		// Store the result in the output folder
 		maxValuePerSensorDS.write().format("csv").save(outputPath);
