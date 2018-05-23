@@ -3,7 +3,11 @@ package it.polito.gjcode.spark.lab8;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Encoders;
 import org.apache.spark.sql.SparkSession;
-import org.apache.spark.sql.functions;
+import static org.apache.spark.sql.functions.*;
+
+import org.apache.spark.sql.Column;
+
+// **** DATASET SOLUTION ****
 
 public class SparkDriver1 {
 
@@ -19,24 +23,50 @@ public class SparkDriver1 {
 		// Create spark session
 		SparkSession session = SparkSession.builder().appName("[Spark app lab8]").getOrCreate();
 
-		// Create datasets
+		// Create dataset from registers.csv
+		// Output format:
+		// -- free is equal to 1 if free_slots == 0, 1 otherwise
+		// | station | slot | free |
 
-		Dataset<Register> registersDataset = session.read().format("csv").option("header", true)
-				.option("inferSchema", true).load(registersPath).as(Encoders.bean(Register.class)).filter(element -> {
-					return !(element.getFreeSlots() == 0 && element.getUsedSlots() == 0);
+		Dataset<RegisterCount> registersDataset = session.read().format("csv").option("header", true)
+				.option("inferSchema", true).option("delimiter", "\\t").load(registersPath)
+				.as(Encoders.bean(Register.class)).filter(element -> {
+					return !(element.getFree_slots() == 0 && element.getUsed_slots() == 0);
 				}).map(e -> {
-					e.setTimeStamp(Tools.getTimeSlot(e.getTimeStamp()));
-					return e;
-				}, Encoders.bean(Register.class));
 
-		Dataset<Station> stationDataset = session.read().format("csv").option("header", true)
-				.option("inferSchema", true).load(stationsPath).as(Encoders.bean(Station.class));
+					RegisterCount registerCount = new RegisterCount(e);
+					return registerCount;
 
-		// Create a DataFrame in the format:
-		// | stationId | slot | count(slot) |
+				}, Encoders.bean(RegisterCount.class));
 
-		registersDataset.groupBy("stationId, timestamp").agg(functions.count("*"));
+		
 
+//		Dataset<Station> stationDataset = session.read().format("csv").option("header", true)
+//				.option("inferSchema", true).option("delimiter", "\\t").load(stationsPath)
+//				.as(Encoders.bean(Station.class));
+//
+//		// Group by stationId and slot to create:
+//		// | stationId | slot | criticalValue |
+//
+//		Dataset<RegisterCriticalValue> regCriticValue = registersDataset.groupBy("stationId", "slot").agg(avg("free"))
+//				.withColumnRenamed("avg(free)", "criticalValue").as(Encoders.bean(RegisterCriticalValue.class));
+//
+//		Dataset<RegisterMaxValue> regMaxValue = regCriticValue.groupBy("stationId").agg(max("criticalValue"))
+//				.withColumnRenamed("max(criticalValue)", "maxValue").as(Encoders.bean(RegisterMaxValue.class))
+//				.filter(el -> el.getMaxValue() > criticalThreshold);
+//
+//		// Create the final dataset with join operation.
+//		// Output format:
+//		// | stationId | criticalSlot | criticalValue | longitude | latitude |
+//
+//		Dataset<Record> finalDataset = regMaxValue.join(stationDataset, "stationId").as(Encoders.bean(Record.class))
+//				.sort(new Column("maxValue").desc());
+//
+//		// Write the final dataset as csv file
+//		finalDataset.repartition(1).write().format("csv").option("header", true).save(outputPath);
+
+		registersDataset.repartition(1).write().format("csv").option("header", true).save(outputPath);
+		
 		// Stop session
 		session.stop();
 

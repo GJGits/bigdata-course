@@ -6,7 +6,7 @@ import scala.Serializable;
 public class Station implements Serializable {
 
 	private int id;
-	private double lat, lng;
+	private double latitude, longitude;
 	private String name;
 
 	public Station() {
@@ -20,20 +20,20 @@ public class Station implements Serializable {
 		this.id = id;
 	}
 
-	public double getLat() {
-		return lat;
+	public double getLatitude() {
+		return latitude;
 	}
 
 	public void setLat(double lat) {
-		this.lat = lat;
+		this.latitude = lat;
 	}
 
-	public double getLng() {
-		return lng;
+	public double getLongitude() {
+		return longitude;
 	}
 
-	public void setLng(double lng) {
-		this.lng = lng;
+	public void setLongitude(double lng) {
+		this.longitude = lng;
 	}
 
 	public String getName() {
