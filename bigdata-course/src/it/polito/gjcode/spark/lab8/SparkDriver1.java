@@ -34,7 +34,11 @@ public class SparkDriver1 {
 					return !(element.getFree_slots() == 0 && element.getUsed_slots() == 0);
 				}).map(e -> {
 
-					RegisterCount registerCount = new RegisterCount(e);
+					RegisterCount registerCount = new RegisterCount();
+					registerCount.setSlot(Tools.getTimeSlot(e.getTimeStamp()));
+					registerCount.setStationId(e.getStation());
+					int free = e.getFree_slots() == 0 ? 1 : 0;
+					registerCount.setFree(free);
 					return registerCount;
 
 				}, Encoders.bean(RegisterCount.class));

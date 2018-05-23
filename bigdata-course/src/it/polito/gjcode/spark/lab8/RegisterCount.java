@@ -10,18 +10,6 @@ public class RegisterCount implements Serializable {
 
 	// this assume 1 for true (free_slots = 0) or 0 for false
 	private int free;
-	
-	public RegisterCount() {
-		// TODO Auto-generated constructor stub
-	}
-	
-	public RegisterCount(Register register) {
-		setStationId(register.getStation());
-		setSlot(Tools.getTimeSlot(register.getTimeStamp()));
-		int value = register.getFree_slots() == 0 ? 1 : 0;
-		setFree(value);
-	}
-	
 
 	public int getStationId() {
 		return stationId;
