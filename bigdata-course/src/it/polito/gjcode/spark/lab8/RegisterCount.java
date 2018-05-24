@@ -35,4 +35,9 @@ public class RegisterCount implements Serializable {
 		this.free = yesOrNot;
 	}
 
+	@Override
+	public String toString() {
+		return String.join("\\t", "" + stationId, slot);
+	}
+
 }
