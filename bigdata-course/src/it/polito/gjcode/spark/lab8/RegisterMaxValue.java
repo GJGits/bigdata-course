@@ -6,7 +6,6 @@ import java.io.Serializable;
 public class RegisterMaxValue implements Serializable {
 
 	private int stationId;
-	private String slot;
 	private double maxValue;
 
 	public int getStationId() {
@@ -17,13 +16,6 @@ public class RegisterMaxValue implements Serializable {
 		this.stationId = stationId;
 	}
 
-	public String getSlot() {
-		return slot;
-	}
-
-	public void setSlot(String slot) {
-		this.slot = slot;
-	}
 
 	public double getMaxValue() {
 		return maxValue;

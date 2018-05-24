@@ -5,19 +5,11 @@ import scala.Serializable;
 @SuppressWarnings("serial")
 public class Station implements Serializable {
 
-	private int id;
+	private int stationId;
 	private double latitude, longitude;
 	private String name;
 
 	public Station() {
-	}
-
-	public int getId() {
-		return id;
-	}
-
-	public void setId(int id) {
-		this.id = id;
 	}
 
 	public double getLatitude() {
@@ -43,7 +35,13 @@ public class Station implements Serializable {
 	public void setName(String name) {
 		this.name = name;
 	}
-	
-	
+
+	public int getStationId() {
+		return stationId;
+	}
+
+	public void setStationId(int stationId) {
+		this.stationId = stationId;
+	}
 
 }

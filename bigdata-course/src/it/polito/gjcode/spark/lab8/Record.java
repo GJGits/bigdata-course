@@ -6,8 +6,7 @@ import java.io.Serializable;
 public class Record implements Serializable {
 
 	private int stationId;
-	private String slot;
-	private double criticality, longitude, latitude;
+	private double maxValue, longitude, latitude;
 
 	public int getStationId() {
 		return stationId;
@@ -15,22 +14,6 @@ public class Record implements Serializable {
 
 	public void setStationId(int stationId) {
 		this.stationId = stationId;
-	}
-
-	public String getSlot() {
-		return slot;
-	}
-
-	public void setSlot(String slot) {
-		this.slot = slot;
-	}
-
-	public double getCriticality() {
-		return criticality;
-	}
-
-	public void setCriticality(double criticality) {
-		this.criticality = criticality;
 	}
 
 	public double getLongitude() {
@@ -47,6 +30,14 @@ public class Record implements Serializable {
 
 	public void setLatitude(double latitude) {
 		this.latitude = latitude;
+	}
+
+	public double getMaxValue() {
+		return maxValue;
+	}
+
+	public void setMaxValue(double maxValue) {
+		this.maxValue = maxValue;
 	}
 
 }

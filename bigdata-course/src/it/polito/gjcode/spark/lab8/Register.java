@@ -1,14 +1,15 @@
 package it.polito.gjcode.spark.lab8;
 
 import java.io.Serializable;
+import java.sql.Timestamp;
 
+@SuppressWarnings("serial")
 public class Register implements Serializable {
 
-	private static final long serialVersionUID = -3855122252759937251L;
 	private int station;
-	private String timestamp;
-	private int used_slots;
-	private int free_slots;
+	private Timestamp timestamp;
+	private double used_slots;
+	private double free_slots;
 
 	public int getStation() {
 		return station;
@@ -18,34 +19,28 @@ public class Register implements Serializable {
 		this.station = station;
 	}
 
-	public String getTimestamp() {
+	public Timestamp getTimestamp() {
 		return timestamp;
 	}
 
-	public void setTimestamp(String timestamp) {
+	public void setTimestamp(Timestamp timestamp) {
 		this.timestamp = timestamp;
 	}
 
-	public int getUsed_slots() {
+	public double getUsed_slots() {
 		return used_slots;
 	}
 
-	public void setUsed_slots(int used_slots) {
+	public void setUsed_slots(double used_slots) {
 		this.used_slots = used_slots;
 	}
 
-	public int getFree_slots() {
+	public double getFree_slots() {
 		return free_slots;
 	}
 
-	public void setFree_slots(int free_slots) {
+	public void setFree_slots(double free_slots) {
 		this.free_slots = free_slots;
-	}
-
-	@Override
-	public String toString() {
-		return String.join("\\t", String.valueOf(station), timestamp, String.valueOf(used_slots),
-				String.valueOf(free_slots));
 	}
 
 }

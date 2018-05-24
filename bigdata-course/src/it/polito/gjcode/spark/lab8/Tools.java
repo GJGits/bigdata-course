@@ -3,7 +3,10 @@ package it.polito.gjcode.spark.lab8;
 import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
 import java.net.URI;
+import java.sql.Timestamp;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -15,6 +18,15 @@ import org.apache.hadoop.fs.Path;
 import java.io.IOException;
 
 public class Tools {
+
+	public static String getTimeSlot(Timestamp timestamp) {
+
+		LocalDateTime dateTime = timestamp.toLocalDateTime();
+		DayOfWeek dayOfWeek = dateTime.getDayOfWeek();
+		int hour = dateTime.getHour();
+
+		return dayOfWeek + "-" + hour;
+	}
 
 	public static String getTimeSlot(String timeStamp) {
 
