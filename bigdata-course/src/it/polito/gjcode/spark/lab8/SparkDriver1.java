@@ -45,21 +45,15 @@ public class SparkDriver1 {
 				.option("inferSchema", true).option("delimiter", "\\t").load(stationsPath)
 				.withColumnRenamed("id", "stationId").as(Encoders.bean(Station.class));
 
-		stationDataset.show(50);
-
 		// Group by stationId and slot to create:
 		// | stationId | slot | criticalValue |
 
 		Dataset<RegisterCriticalValue> regCriticValue = registersDataset.groupBy("stationId", "slot").agg(avg("free"))
 				.withColumnRenamed("avg(free)", "criticalValue").as(Encoders.bean(RegisterCriticalValue.class));
 
-		regCriticValue.show(50);
-
 		Dataset<RegisterMaxValue> regMaxValue = regCriticValue.groupBy("stationId").agg(max("criticalValue"))
 				.withColumnRenamed("max(criticalValue)", "maxValue").as(Encoders.bean(RegisterMaxValue.class))
 				.filter(el -> el.getMaxValue() > criticalThreshold);
-
-		regMaxValue.show(50);
 
 		// Create the final dataset with join operation.
 		// Output format:
@@ -67,8 +61,6 @@ public class SparkDriver1 {
 
 		Dataset<Record> finalDataset = regMaxValue.join(stationDataset, "stationId").as(Encoders.bean(Record.class))
 				.sort(new Column("maxValue").desc());
-
-		finalDataset.show(50);
 
 		// Write the final dataset as csv file
 		finalDataset.repartition(1).write().format("csv").option("header", true).save(outputPath);
