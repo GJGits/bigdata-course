@@ -1,4 +1,4 @@
-package it.polito.gjcode.spark.lab8;
+package it.polito.gjcode.spark.lab8.dataframe;
 
 import java.sql.Timestamp;
 import java.text.ParseException;
