@@ -1,4 +1,4 @@
-package it.polito.gjcode.hadoop.esame1;
+package it.polito.gjcode.exam1;
 
 import java.io.IOException;
 import java.util.TreeMap;

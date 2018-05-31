@@ -1,4 +1,4 @@
-package it.polito.gjcode.hadoop.esame1;
+package it.polito.gjcode.exam1;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;

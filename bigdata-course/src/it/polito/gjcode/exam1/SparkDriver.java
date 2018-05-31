@@ -1,4 +1,4 @@
-package it.polito.gjcode.spark.esame1;
+package it.polito.gjcode.exam1;
 
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
