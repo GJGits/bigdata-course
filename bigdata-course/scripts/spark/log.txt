@@ -1,0 +1,12 @@
+java.lang.ClassNotFoundException: it.polito.bigdata.spark.SparkDriver
+	at java.net.URLClassLoader.findClass(URLClassLoader.java:381)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:424)
+	at java.lang.ClassLoader.loadClass(ClassLoader.java:357)
+	at java.lang.Class.forName0(Native Method)
+	at java.lang.Class.forName(Class.java:348)
+	at org.apache.spark.util.Utils$.classForName(Utils.scala:235)
+	at org.apache.spark.deploy.SparkSubmit$.org$apache$spark$deploy$SparkSubmit$$runMain(SparkSubmit.scala:836)
+	at org.apache.spark.deploy.SparkSubmit$.doRunMain$1(SparkSubmit.scala:197)
+	at org.apache.spark.deploy.SparkSubmit$.submit(SparkSubmit.scala:227)
+	at org.apache.spark.deploy.SparkSubmit$.main(SparkSubmit.scala:136)
+	at org.apache.spark.deploy.SparkSubmit.main(SparkSubmit.scala)
