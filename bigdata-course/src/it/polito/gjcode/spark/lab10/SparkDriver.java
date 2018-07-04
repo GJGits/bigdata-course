@@ -26,13 +26,9 @@ public class SparkDriver {
 		jssc.checkpoint("checkpointfolder");
 
 		JavaDStream<String> tweets = jssc.textFileStream(inputFolder);
-
-		// TODO
-		// Process the tweets JavaDStream.
-		// Every time a new file is uploaded in inputFolder a new set of streaming data
-		// is generated
-		// ...
-
+		JavaDStream<String> hashtaggedTweets = tweets.filter(line -> line.contains("#"));
+        
+		
 		// Start the computation
 		jssc.start();
 
