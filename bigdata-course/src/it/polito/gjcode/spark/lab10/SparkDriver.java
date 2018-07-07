@@ -7,7 +7,10 @@ import org.apache.spark.streaming.api.java.JavaStreamingContext;
 
 import scala.Tuple2;
 
-import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.spark.SparkConf;
 
@@ -32,19 +35,36 @@ public class SparkDriver {
 
 		JavaDStream<String> tweets = jssc.textFileStream(inputFolder);
 
-		// Apply the "standard" transformations to perform the word count task
-		// However, the "returned" RDDs are DStream/PairDStream RDDs
-		JavaDStream<String> hashtags = tweets.flatMap(line -> Arrays.asList(line.split("\\s+")).iterator())
-				.filter(line -> line.startsWith("#"));
+		// Select only tweets with hashtag
+		JavaDStream<String> filteredTweets = tweets.filter(line -> line.contains("#"));
 
-		// Count the occurences of hashtags and sort by value
-		JavaPairDStream<String, Integer> hashtagCount = hashtags.mapToPair(line -> new Tuple2<String, Integer>(line, 1))
-				.reduceByKeyAndWindow((el1, el2) -> el1 + el2, Durations.seconds(30), Durations.seconds(10))
-				.transformToPair(s -> s.sortByKey(false));
+		JavaPairDStream<String, Integer> hashtagOne = filteredTweets.flatMapToPair(line -> {
+
+			String[] tokens = line.split("\t");
+			String tweet = tokens[1];
+			Pattern p = Pattern.compile("#\\w+");
+			Matcher m = p.matcher(tweet);
+			int groupCount = m.groupCount();
+			List<Tuple2<String, Integer>> hashtags = new LinkedList<>();
+
+			for (int i = 0; i < groupCount; i++)
+				hashtags.add(new Tuple2<>(m.group(i), 1));
+
+			return hashtags.iterator();
+
+		});
+
+		JavaPairDStream<String, Integer> hashtagSum = hashtagOne.reduceByKeyAndWindow((v1, v2) -> {
+			return v1 + v2;
+		}, Durations.seconds(30), Durations.seconds(10));
+
+		JavaPairDStream<Integer, String> orderedHashTags = hashtagSum.mapToPair(pair -> {
+			return new Tuple2<Integer, String>(pair._2, pair._1);
+		}).transformToPair(rdd -> rdd.sortByKey(false));
 
 		// Print the num. of occurrences of each word of the current window
 		// (only 10 of them)
-		hashtagCount.print();
+		orderedHashTags.print();
 
 		// Select only relevant hashtags
 		// JavaPairDStream<String, Integer> relevantHashtags =
@@ -52,7 +72,7 @@ public class SparkDriver {
 
 		// Store the output of the computation in the folders with prefix
 		// outputPathPrefix
-		hashtagCount.dstream().saveAsTextFiles(outputPathPrefix, "");
+		orderedHashTags.dstream().saveAsTextFiles(outputPathPrefix, "");
 
 		// Start the computation
 		jssc.start();

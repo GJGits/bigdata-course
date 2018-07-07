@@ -1,0 +1,2 @@
+nome,cognome,eta,dataRegistrazione,oraRegistrazione,importoInserito
+Marco,Nanci,24,2018/07/07,11:38,23.50
